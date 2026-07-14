@@ -26,12 +26,12 @@ export class NotFoundError extends AppError {
 
 export class ConflictError extends AppError {
   constructor(message: string, details: any = null) {
-    super('RESOURCE_ALREADY_EXISTS', message, 409, details);
+    super('CONFLICT_OF_BUSINESS_RULES', message, 409, details);
   }
 }
 
 export class UnprocessableEntityError extends AppError {
   constructor(message: string, details: any = null) {
-    super('INSUFFICIENT_STOCK_ERROR', message, 422, details);
+    super('UNPROCESSABLE_ENTITY', message, 422, details);
   }
 }
