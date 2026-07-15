@@ -1,15 +1,17 @@
-import { CategoryRepository } from './catalog.repository.js';
+import crypto from 'crypto';
+import { ICatalogRepository } from './interfaces/catalog.repository.interface.js';
 import { ConflictError, NotFoundError, UnprocessableEntityError } from '../../infra/errors/specific.errors.js';
 import type { CreateCategoryDto } from './dtos/create-catalog.dto.js';
 import type { CategoryEntity } from './entities/catalog.entity.js';
 import type { CategoryResponseDto } from './dtos/catalog-response.dto.js';
+import { CatalogMapper } from './mappers/catalog.mapper.js';
 
 export class CategoryService {
-  constructor(private categoryRepository: CategoryRepository) {}
+  constructor(private categoryRepository: ICatalogRepository) {}
 
   async getAllCategories(): Promise<CategoryResponseDto[]> {
     const entities = await this.categoryRepository.findAll();
-    return entities.map(entity => this.toResponseDto(entity));
+    return CatalogMapper.toResponseDtoList(entities);
   }
 
   async createCategory(dto: CreateCategoryDto): Promise<CategoryResponseDto> {
@@ -21,8 +23,13 @@ export class CategoryService {
       });
     }
 
-    const entity = await this.categoryRepository.create(dto);
-    return this.toResponseDto(entity);
+    const newCategory: CategoryEntity = {
+      id: crypto.randomUUID(),
+      name: dto.name
+    };
+
+    const entity = await this.categoryRepository.create(newCategory);
+    return CatalogMapper.toResponseDto(entity);
   }
 
   async updateCategory(id: string, dto: CreateCategoryDto): Promise<CategoryResponseDto> {
@@ -34,12 +41,17 @@ export class CategoryService {
       });
     }
 
-    const updatedEntity = await this.categoryRepository.update(id, dto);
+    const entityToUpdate: CategoryEntity = {
+      id,
+      name: dto.name
+    };
+
+    const updatedEntity = await this.categoryRepository.update(entityToUpdate);
     if (!updatedEntity) {
       throw new NotFoundError('La categoría solicitada no existe o fue removida.', { searchedId: id });
     }
 
-    return this.toResponseDto(updatedEntity);
+    return CatalogMapper.toResponseDto(updatedEntity);
   }
 
   async deleteCategory(id: string): Promise<void> {
@@ -56,12 +68,5 @@ export class CategoryService {
     }
 
     await this.categoryRepository.delete(id);
-  }
-
-  private toResponseDto(entity: CategoryEntity): CategoryResponseDto {
-    return {
-      id: entity.id,
-      name: entity.name
-    };
   }
 }

@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { PurchaseRepository } from './shopping.repository.js';
-import { ProductRepository } from '../products/product.repository.js';
+import { ProductRepositoryMocks } from '../products/product.repository.js';
 import { SupplierRepository } from '../supplier/supplier.repository.js';
 import { NotFoundError } from '../../infra/errors/specific.errors.js';
 import type { CreatePurchaseDto } from './dtos/create-shopping.dt.js';
@@ -9,7 +9,7 @@ import type { PurchaseEntity, PurchaseItemEntity } from './entities/shopping.ent
 
 export class PurchaseService {
   private supplierRepository = new SupplierRepository();
-  private productRepository = new ProductRepository();
+  private productRepository = new ProductRepositoryMocks();
 
   constructor(private purchaseRepository: PurchaseRepository) {}
 

@@ -2,6 +2,8 @@ import { type Request, type Response, type NextFunction } from 'express';
 import { CategoryService } from './catalog.service.js';
 import { BadRequestError } from '../../infra/errors/specific.errors.js';
 import type { CreateCategoryDto } from './dtos/create-catalog.dto.js';
+import { paginate } from '../../infra/utils/pagination.util.js';
+import { validateCategory } from '../../infra/utils/validator.js';
 
 export class CategoryController {
   constructor(private categoryService: CategoryService) {}
@@ -11,33 +13,11 @@ export class CategoryController {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
 
-      if (isNaN(page) || isNaN(limit)) {
-        throw new BadRequestError(
-          'La estructura de la petición contiene errores de sintaxis o parámetros ausentes.',
-          {
-            invalidQueryParam: isNaN(limit) ? 'limit' : 'page',
-            expectedType: 'integer',
-            receivedValue: isNaN(limit) ? req.query.limit : req.query.page
-          }
-        );
-      }
-
       const allCategories = await this.categoryService.getAllCategories();
       
-      const total = allCategories.length;
-      const totalPages = Math.ceil(total / limit) || 1;
-      const startIndex = (page - 1) * limit;
-      const paginatedData = allCategories.slice(startIndex, startIndex + limit);
-
-      res.status(200).json({
-        data: paginatedData,
-        pagination: { 
-          page,
-          limit,
-          total,
-          totalPages
-        }
-      });
+      const result = paginate(allCategories, page, limit);
+      
+      res.status(200).json({ result });
     } catch (error) {
       next(error);
     }
@@ -47,14 +27,9 @@ export class CategoryController {
     try {
       const dto: CreateCategoryDto = req.body;
       
-      if (!dto || !dto.name) {
-        throw new BadRequestError(
-          'La estructura de la petición contiene errores de sintaxis o parámetros ausentes.',
-          {
-            invalidFields: ['name'].filter(f => !req.body?.[f]),
-            expectedType: 'string'
-          }
-        );
+      const errors = validateCategory(dto);
+      if (Object.keys(errors).length > 0) {
+        throw new BadRequestError('Error de validación', errors);
       }
 
       const newCategory = await this.categoryService.createCategory(dto);
@@ -76,11 +51,9 @@ export class CategoryController {
         );
       }
 
-      if (!dto || Object.keys(dto).length === 0 || !dto.name) {
-        throw new BadRequestError(
-          'La estructura de la petición contiene errores de sintaxis o parámetros ausentes.',
-          { body: 'Debe enviar el campo name para actualizar.' }
-        );
+      const errors = validateCategory(dto);
+      if (Object.keys(errors).length > 0) {
+        throw new BadRequestError('Error de validación', errors);
       }
 
       const updatedCategory = await this.categoryService.updateCategory(String(id), dto);

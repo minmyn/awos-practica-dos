@@ -3,50 +3,47 @@ import { ProductService } from './product.service.js';
 import { BadRequestError } from '../../infra/errors/specific.errors.js';
 import type { CreateProductDto } from './dtos/create-product.dto.js';
 import type { UpdateProductDto } from './dtos/update-product.dto.js';
+import { paginate } from '../../infra/utils/pagination.util.js';
 
 export class ProductController {
   constructor(private productService: ProductService) {}
+
+  getExternalProducts = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const search = req.query.search as string | undefined;
+      if (!search) {
+        throw new BadRequestError(
+          'Debes proporcionar una palabra de búsqueda.', 
+          { invalidQueryParam: 'search' }
+        );
+      }
+
+      const products = await this.productService.getExternalProducts(search);
+      res.status(200).json(products);
+    } catch (error) {
+      next(error);
+    }
+  };
 
   getProducts = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const search = req.query.search as string | undefined;
       const pageStr = req.query.page as string || '1';
       const limitStr = req.query.limit as string || '10';
-
       const page = parseInt(pageStr, 10);
       const limit = parseInt(limitStr, 10);
 
       if (isNaN(page) || page <= 0) {
-        throw new BadRequestError('La estructura de la petición contiene errores de sintaxis o parámetros ausentes.', {
-          invalidQueryParam: 'page',
-          expectedType: 'integer',
-          receivedValue: pageStr
-        });
+        throw new BadRequestError('Error en parametros', { invalidQueryParam: 'page' });
       }
       if (isNaN(limit) || limit <= 0) {
-        throw new BadRequestError('La estructura de la petición contiene errores de sintaxis o parámetros ausentes.', {
-          invalidQueryParam: 'limit',
-          expectedType: 'integer',
-          receivedValue: limitStr
-        });
+        throw new BadRequestError('Error en parametros', { invalidQueryParam: 'limit' });
       }
 
       const allProducts = await this.productService.getProducts(search);
-      
-      const total = allProducts.length;
-      const totalPages = Math.ceil(total / limit);
-      const startIndex = (page - 1) * limit;
-      const paginatedData = allProducts.slice(startIndex, startIndex + limit);
+      const result = paginate(allProducts, page, limit);
 
-      res.status(200).json({
-        data: paginatedData,
-        meta: {
-          page,
-          limit,
-          total,
-          totalPages
-        }
-      });
+      res.status(200).json(result);
     } catch (error) {
       next(error);
     }
@@ -65,13 +62,11 @@ export class ProductController {
   createProduct = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const dto: CreateProductDto = req.body;
-
       if (!dto.name || dto.price === undefined || !dto.categoryName) {
-        throw new BadRequestError('La estructura de la petición contiene errores de sintaxis o parámetros ausentes.', {
-          invalidFields: ['name', 'price', 'categoryName'].filter(f => req.body[f] === undefined)
+        throw new BadRequestError('Parametros ausentes', { 
+          invalidFields: ['name', 'price', 'categoryName'].filter(f => req.body[f] === undefined) 
         });
       }
-
       const newProduct = await this.productService.createProduct(dto);
       res.status(201).json(newProduct);
     } catch (error) {
@@ -83,7 +78,6 @@ export class ProductController {
     try {
       const { id } = req.params;
       const dto: UpdateProductDto = req.body;
-
       const updated = await this.productService.updateProduct(String(id), dto);
       res.status(200).json(updated);
     } catch (error) {

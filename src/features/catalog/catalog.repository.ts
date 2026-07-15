@@ -1,60 +1,39 @@
 import type { CategoryEntity } from './entities/catalog.entity.js';
-import type { CreateCategoryDto } from './dtos/create-catalog.dto.js';
+import { ICatalogRepository } from './interfaces/catalog.repository.interface.js';
 
-export class CategoryRepository {
-  private static categories: CategoryEntity[] = [
-    ...Array.from({ length: 9 }, (_, index) => {
-      const nombresAbarrotes = [
-        'Lacteos',
-        'Enlatados',
-        'Limpieza',
-        'Bebidas',
-        'Panadería',
-        'Cuidado Personal',
-        'Frutas y Verduras',
-      ];
-      
-      return {
-        id: crypto.randomUUID(),
-        name: nombresAbarrotes[index] || `Categoria${index + 1}`
-      };
-    })
-  ];
+export class CategoryRepositoryMocks implements ICatalogRepository {
+  private static categories: CategoryEntity[] = [];
 
   async findAll(): Promise<CategoryEntity[]> {
-    return CategoryRepository.categories;
+    return CategoryRepositoryMocks.categories;
   }
 
   async findById(id: string): Promise<CategoryEntity | null> {
-    return CategoryRepository.categories.find(c => c.id === id) || null;
+    return CategoryRepositoryMocks.categories.find(c => c.id === id) || null;
   }
 
   async findByName(name: string): Promise<CategoryEntity | null> {
-    return CategoryRepository.categories.find(c => c.name.toLowerCase() === name.toLowerCase()) || null;
+    return CategoryRepositoryMocks.categories.find(c => c.name.toLowerCase() === name.toLowerCase()) || null;
   }
 
-  async create(dto: CreateCategoryDto): Promise<CategoryEntity> {
-    const newCategory: CategoryEntity = {
-      id: crypto.randomUUID(),
-      name: dto.name
-    };
-    CategoryRepository.categories.push(newCategory);
-    return newCategory;
+  async create(entity: CategoryEntity): Promise<CategoryEntity> {
+    CategoryRepositoryMocks.categories.push(entity);
+    return entity;
   }
 
-  async update(id: string, dto: CreateCategoryDto): Promise<CategoryEntity | null> {
-    const category = CategoryRepository.categories.find(c => c.id === id);
-    if (!category) return null;
-
-    category.name = dto.name;
-    return category;
+  async update(entity: CategoryEntity): Promise<CategoryEntity | null> {
+    const index = CategoryRepositoryMocks.categories.findIndex(c => c.id === entity.id);
+    if (index === -1) return null;
+    
+    CategoryRepositoryMocks.categories[index] = entity;
+    return entity;
   }
 
   async delete(id: string): Promise<boolean> {
-    const index = CategoryRepository.categories.findIndex(c => c.id === id);
+    const index = CategoryRepositoryMocks.categories.findIndex(c => c.id === id);
     if (index === -1) return false;
 
-    CategoryRepository.categories.splice(index, 1);
+    CategoryRepositoryMocks.categories.splice(index, 1);
     return true;
   }
 }

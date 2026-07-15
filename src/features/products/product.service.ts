@@ -1,98 +1,110 @@
-import { ProductRepository } from './product.repository.js';
-import { CategoryRepository } from '../catalog/catalog.repository.js';
+import crypto from 'crypto';
 import { NotFoundError, ConflictError, UnprocessableEntityError } from '../../infra/errors/specific.errors.js';
 import type { CreateProductDto } from './dtos/create-product.dto.js';
 import type { UpdateProductDto } from './dtos/update-product.dto.js';
 import type { ProductResponseDto } from './dtos/product-response.dto.js';
-import type { ProductEntity } from './entities/product.entity.js';
+import { FakeStoreProvider } from '../../infra/providers/fake-store.provider.js';
+import { IProductRepository } from './interfaces/product.repository.interface.js';
+import { ICatalogRepository } from '../catalog/interfaces/catalog.repository.interface.js';
+import { ProductMapper } from './mappers/product.mapper.js';
 
 export class ProductService {
-  private categoryRepository = new CategoryRepository();
+  private fakeStoreProvider = new FakeStoreProvider();
 
-  constructor(private productRepository: ProductRepository) {}
+  constructor(
+    private productRepository: IProductRepository,
+    private categoryRepository: ICatalogRepository
+  ) {}
+
+  async getExternalProducts(search: string): Promise<any[]> {
+    const externalProducts = await this.fakeStoreProvider.getAllProducts();
+    
+    const query = search.toLowerCase();
+    const filteredProducts = externalProducts.filter((ep: any) => 
+      ep.title.toLowerCase().includes(query)
+    );
+
+    return filteredProducts.map((ep: any) => ({
+      name: ep.title,
+      price: ep.price,
+      categoryName: ep.category,
+      minStock: 5,
+      inStock: 0,
+      barcode: `Fake-${ep.id}`
+    }));
+  }
 
   async getProducts(search?: string): Promise<ProductResponseDto[]> {
     let products = await this.productRepository.findAll();
-
     if (search) {
       const query = search.toLowerCase();
       products = products.filter(p => 
         p.name.toLowerCase().includes(query) || p.barcode.includes(query)
       );
     }
-
-    return products.map(p => this.toResponseDto(p));
+    return products.map(p => ProductMapper.toResponseDto(p));
   }
 
   async getProductById(id: string): Promise<ProductResponseDto> {
     const product = await this.productRepository.findById(id);
     if (!product) {
-      throw new NotFoundError('El artículo solicitado no existe en el catálogo o fue removido lógicamente.', { searchedId: id });
+      throw new NotFoundError('El articulo solicitado no existe.', { searchedId: id });
     }
-    return this.toResponseDto(product);
+    return ProductMapper.toResponseDto(product);
   }
 
   async createProduct(dto: CreateProductDto): Promise<ProductResponseDto> {
     if (dto.price <= 0) {
-      throw new UnprocessableEntityError('El precio debe ser un valor numérico mayor a cero.');
+      throw new UnprocessableEntityError('El precio debe ser un valor numerico mayor a cero.');
     }
 
     const existingProduct = await this.productRepository.findByName(dto.name);
     if (existingProduct) {
-      throw new ConflictError('Conflicto de unicidad de datos en la persistencia del sistema.', {
+      throw new ConflictError('Conflicto de unicidad.', {
         conflictingField: 'name',
         conflictingValue: dto.name
       });
     }
     
-    const existingCategory = await this.categoryRepository.findByName(dto.categoryName);
-    if (!existingCategory) {
-      throw new NotFoundError('La categoría asociada provista no existe en el sistema.', { categoryName: dto.categoryName });
+    let category = await this.categoryRepository.findByName(dto.categoryName);
+    if (!category) {
+      category = await this.categoryRepository.create({
+        id: crypto.randomUUID(),
+        name: dto.categoryName
+      });
     }
 
     const cleanDto = { ...dto, inStock: dto.inStock ?? 0 };
+    const newEntity = ProductMapper.toEntity(cleanDto, category);
+    const savedEntity = await this.productRepository.create(newEntity);
 
-    const newEntity = await this.productRepository.create(cleanDto);
-    return this.toResponseDto(newEntity);
+    return ProductMapper.toResponseDto(savedEntity);
   }
 
   async updateProduct(id: string, dto: UpdateProductDto): Promise<ProductResponseDto> {
     if (dto.price !== undefined && dto.price <= 0) {
-      throw new UnprocessableEntityError('El precio debe ser un valor numérico mayor a cero.');
+      throw new UnprocessableEntityError('El precio debe ser un valor numerico mayor a cero.');
     }
 
     if (dto.categoryName !== undefined) {
       const existingCategory = await this.categoryRepository.findByName(dto.categoryName);
       if (!existingCategory) {
-        throw new NotFoundError('La categoría asociada provista no existe en el sistema.', { categoryName: dto.categoryName });
+        throw new NotFoundError('La categoria no existe.', { categoryName: dto.categoryName });
       }
     }
 
     const updatedEntity = await this.productRepository.update(id, dto);
     if (!updatedEntity) {
-      throw new NotFoundError('El artículo solicitado no existe en el catálogo o fue removido lógicamente.', { searchedId: id });
+      throw new NotFoundError('El articulo solicitado no existe.', { searchedId: id });
     }
 
-    return this.toResponseDto(updatedEntity);
+    return ProductMapper.toResponseDto(updatedEntity);
   }
 
   async removeProduct(id: string): Promise<void> {
     const success = await this.productRepository.softDelete(id);
     if (!success) {
-      throw new NotFoundError('El artículo solicitado no existe en el catálogo o fue removido lógicamente.', { searchedId: id });
+      throw new NotFoundError('El articulo solicitado no existe.', { searchedId: id });
     }
-  }
-
-  private toResponseDto(entity: ProductEntity): ProductResponseDto {
-    return {
-      id: entity.id,
-      name: entity.name,
-      price: entity.price,
-      minStock: entity.minStock,
-      inStock: entity.inStock,
-      barcode: entity.barcode,
-      categoryName: entity.category.name,
-      stockStatus: entity.inStock <= entity.minStock ? 'LOW_STOCK' : 'OK'
-    };
   }
 }

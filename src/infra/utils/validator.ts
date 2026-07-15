@@ -66,3 +66,20 @@ export const validateUpdateUser = (data: any): Record<string, string> => {
 
   return errors;
 };
+
+export const validateCategory = (data: any): Record<string, string> => {
+  const errors: Record<string, string> = {};
+
+  if (!data || Object.keys(data).length === 0) {
+    errors.general = "El cuerpo de la petición no puede estar vacío.";
+    return errors;
+  }
+
+  if (!data.name) {
+    errors.name = "El nombre de la categoría es obligatorio.";
+  } else if (data.name.length < 3) {
+    errors.name = "El nombre de la categoría debe tener al menos 3 caracteres.";
+  }
+
+  return errors;
+};
