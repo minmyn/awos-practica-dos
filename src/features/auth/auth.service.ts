@@ -1,67 +1,66 @@
-import { UserRepository } from '../user/user.repository.js';
+import { IUserRepository } from '../user/interfaces/user.repository.interface.js';
 import { ConflictError, UnauthorizedError, NotFoundError } from '../../infra/errors/specific.errors.js';
-import type { RegisterRequestDto } from './dtos/register.request.js';
-import type { LoginRequestDto } from './dtos/login.request.js';
-import type { AuthResponseDto } from './dtos/auth.response.js';
+import type { RegisterRequestDto } from './dtos/register.dto.js';
+import type { LoginRequestDto } from './dtos/login.dto.js';
+import type { AuthResponseDto } from './dtos/auth-response.dto.js';
+import jwt from 'jsonwebtoken'; 
+import bcrypt from 'bcryptjs';
+import { IRoleRepository } from '../user/interfaces/role.repository.interface.js';
+import { UserMapper } from '../user/mappers/user.mapper.js';
 
 export class AuthService {
-  constructor(private userRepository: UserRepository) {}
+  constructor(
+    private userRepository: IUserRepository,
+    private roleRepository: IRoleRepository 
+  ) {}
 
   async register(dto: RegisterRequestDto): Promise<AuthResponseDto> {
     const existingUser = await this.userRepository.findByUsername(dto.username);
-    if (existingUser) {
-      throw new ConflictError(
-        'Conflicto de unicidad de datos en la persistencia del sistema.',
-        { conflictingField: 'username', conflictingValue: dto.username }
-      );
-    }
 
-    const existingEmail = await this.userRepository.findByEmail(dto.email);
-    if (existingEmail) {
-      throw new ConflictError(
-        'Conflicto de unicidad de datos en la persistencia del sistema.',
-        { conflictingField: 'email', conflictingValue: dto.email }
-      );
-    }
+    if (existingUser) throw new ConflictError('Usuario ya existe');
 
-    const userEntity = await this.userRepository.create(dto);
+    const clientRole = await this.roleRepository.findByName('CLIENT');
+    if (!clientRole) throw new Error('Rol por defecto no encontrado');
 
-    const userWithRole = { ...userEntity, role: 'CLIENT' };
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
 
-    return this.toAuthResponseDto(userWithRole);
+    const userEntity = UserMapper.toEntityFromRegister(dto, hashedPassword, clientRole);
+
+    const savedUser = await this.userRepository.create(userEntity);
+
+    return this.toAuthResponseDto(savedUser);
   }
 
   async login(dto: LoginRequestDto): Promise<AuthResponseDto> {
-    const user = await this.userRepository.findByUsername(dto.username);
-    if (!user) {
-      throw new NotFoundError(
-        'El usuario solicitado no existe en el sistema.',
-        { searchedUsername: dto.username }
-      );
-    }
+    const existingUser = await this.userRepository.findByUsername(dto.username);
+    if (!existingUser) throw new UnauthorizedError('Credenciales incorrectas');
   
-    if (user.password !== `hashed_${dto.password}`) {
-      throw new UnauthorizedError(
-        'No se ha proporcionado una sesión activa o las credenciales son incorrectas.',
-        { status: 'InvalidCredentials' }
-      );
+    const isMatch = await bcrypt.compare(dto.password, existingUser.password);
+    if (!isMatch) {
+      throw new UnauthorizedError('Credenciales incorrectas');
     }
 
-    const role = user.username.toLowerCase() === 'admin' ? 'ADMIN' : 'CLIENT';
-
-    return this.toAuthResponseDto({ ...user, role });
+    return this.toAuthResponseDto({ ...existingUser });
   }
 
   private toAuthResponseDto(user: any): AuthResponseDto {
-    const userRole = user.role || 'CLIENT';
+    const userRole = user.role.name;
+    
+    const token = jwt.sign(
+      { id: user.id, role: userRole }, 
+      process.env.JWT_SECRET || 'secret_key', 
+      { expiresIn: '1h' }
+    );
+
     return {
       id: user.id,
-      name: user.fullName || user.name,
+      name: user.name,
       username: user.username,
       email: user.email,
       role: userRole,
-      token: `${user.id}.${userRole}`, 
+      token: token,
       expiresIn: '3600s'
     };
   }
+
 }

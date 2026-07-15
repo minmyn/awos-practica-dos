@@ -1,4 +1,5 @@
 import express from 'express';
+import 'dotenv/config';
 import cors from 'cors';
 import { AuthRouter } from './features/auth/auth.router.js';
 import { UserRouter } from './features/user/user.router.js';

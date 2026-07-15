@@ -1,35 +1,22 @@
 import { type Request, type Response, type NextFunction } from 'express';
 import { UserService } from './user.service.js';
 import { BadRequestError } from '../../infra/errors/specific.errors.js';
-import type { UserResponseDto } from './dtos/user.response.js';
 import type { UpdateUserDto } from './dtos/update-user.dto.js';
+import { paginate } from '../../infra/utils/pagination.util.js'; //Nota Min: Cundo ya esta la base de datos cambiar la páginacion para no sobre saturar el cóigo :3
 
 export class UserController {
-  constructor(private userService: UserService) {}
+  constructor(private userService: UserService) { }
 
   getUsers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
 
-      let data: UserResponseDto[] = await this.userService.getAllUsers();
+      const allUsers = await this.userService.getAllUsers();
 
-      const total = data.length;
-      const totalPages = Math.ceil(total / limit) || 1;
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-      
-      const paginatedData = data.slice(startIndex, endIndex);
+      const result = paginate(allUsers, page, limit);
 
-      res.status(200).json({
-        data: paginatedData,
-        meta: {
-          page,
-          limit,
-          total,
-          totalPages
-        }
-      });
+      res.status(200).json(result);
     } catch (error) {
       next(error);
     }
@@ -54,7 +41,7 @@ export class UserController {
         throw new BadRequestError(
           'La estructura de la petición contiene errores de sintaxis o parámetros ausentes.',
           {
-            body: 'Debe enviar al menos un campo válido para actualizar (fullName, username, o email).'
+            body: 'Debe enviar al menos un campo válido para actualizar (name, username, o email).'
           }
         );
       }
@@ -66,10 +53,21 @@ export class UserController {
     }
   };
 
+  updateMyProfile = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userIdFromToken = req.user!.id; 
+      const dto = req.body;
+      const updatedUser = await this.userService.updateUser(userIdFromToken, dto);
+      res.status(200).json(updatedUser);
+    } catch (error) {
+      next(error);
+    }
+  };
+
   deleteUser = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      
+
       await this.userService.removeUser(String(id));
       res.status(204).send();
     } catch (error) {

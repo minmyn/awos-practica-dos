@@ -1,17 +1,22 @@
 import { Router } from 'express';
-import { UserRepository } from './user.repository.js';
+import { UserRepositoryMock, UserRepositoryMysql } from './user.repository.js';
 import { UserService } from './user.service.js';
 import { UserController } from './user.controller.js';
+import { authMiddleware } from '../../infra/middlewares/auth.middleware.js';
+import { authorize } from '../../infra/middlewares/role.middleware.js';
+import { IUserRepository } from './interfaces/user.repository.interface.js';
 
 const router = Router();
 
-const repository = new UserRepository();
+const repository: IUserRepository = new UserRepositoryMock();
 const service = new UserService(repository);
 const controller = new UserController(service);
 
-router.get('/', controller.getUsers);
-router.get('/:id', controller.getUserById);
-router.patch('/:id', controller.updateUser);
-router.delete('/:id', controller.deleteUser);
+router.patch('/profile', authMiddleware, controller.updateMyProfile);
+
+router.get('/', authMiddleware, authorize(['ADMIN']), controller.getUsers);
+router.get('/:id', authMiddleware, authorize(['ADMIN']), controller.getUserById);
+router.patch('/:id', authMiddleware, authorize(['ADMIN']), controller.updateUser);
+router.delete('/:id', authMiddleware, authorize(['ADMIN']), controller.deleteUser);
 
 export const UserRouter = router;
