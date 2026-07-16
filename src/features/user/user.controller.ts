@@ -55,7 +55,7 @@ export class UserController {
 
   updateMyProfile = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userIdFromToken = req.user!.id; 
+      const userIdFromToken = (req as any).user.id;
       const dto = req.body;
       const updatedUser = await this.userService.updateUser(userIdFromToken, dto);
       res.status(200).json(updatedUser);
