@@ -76,7 +76,8 @@ export class PurchaseRepository {
   }
 
   async softDelete(id: string): Promise<boolean> {
-    const purchase = PurchaseRepository.purchases.find(p => p.id === id && p.active);
+    // Buscamos incluso si no estuviera activa por si acaso, aunque el service ya filtró
+    const purchase = PurchaseRepository.purchases.find(p => p.id === id);
     if (!purchase) return false;
 
     purchase.active = false;

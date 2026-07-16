@@ -22,10 +22,15 @@ export class SupplierService {
   }
 
   async createSupplier(dto: CreateSupplierDto): Promise<SupplierResponseDto> {
-    if (dto.phone.length < 10) {
-      throw new BadRequestError('El formato del número telefónico es inválido.', { phone: 'Debe tener al menos 10 dígitos' });
+    // REGLA: El teléfono debe tener al menos 10 dígitos y solo contener números
+    const phoneRegex = /^\d+$/;
+    if (dto.phone.length < 10 || !phoneRegex.test(dto.phone)) {
+      throw new BadRequestError('El formato del número telefónico es inválido.', { 
+        phone: 'Debe tener al menos 10 dígitos y contener únicamente números.' 
+      });
     }
 
+    // REGLA: No duplicar nombres al crear
     const existing = await this.supplierRepository.findByName(dto.name);
     if (existing) {
       throw new ConflictError('Conflicto de unicidad de datos en la persistencia del sistema.', {
@@ -39,16 +44,35 @@ export class SupplierService {
   }
 
   async updateSupplier(id: string, dto: UpdateSupplierDto): Promise<SupplierResponseDto> {
-    if (dto.phone !== undefined && dto.phone.length < 10) {
-      throw new BadRequestError('El formato del número telefónico es inválido.', { phone: 'Debe tener al menos 10 dígitos' });
-    }
-
-    const updatedEntity = await this.supplierRepository.update(id, dto);
-    if (!updatedEntity) {
+    // Primero verificamos que el proveedor a actualizar realmente exista
+    const currentSupplier = await this.supplierRepository.findById(id);
+    if (!currentSupplier) {
       throw new NotFoundError('El proveedor solicitado no existe o fue removido.', { searchedId: id });
     }
 
-    return this.toResponseDto(updatedEntity);
+    // REGLA: Si se actualiza el teléfono, validar su longitud y formato
+    if (dto.phone !== undefined) {
+      const phoneRegex = /^\d+$/;
+      if (dto.phone.length < 10 || !phoneRegex.test(dto.phone)) {
+        throw new BadRequestError('El formato del número telefónico es inválido.', { 
+          phone: 'Debe tener al menos 10 dígitos y contener únicamente números.' 
+        });
+      }
+    }
+
+    // REGLA: Si se cambia el nombre, verificar que el nuevo nombre no lo tenga YA otro proveedor
+    if (dto.name !== undefined && dto.name.toLowerCase() !== currentSupplier.name.toLowerCase()) {
+      const existing = await this.supplierRepository.findByName(dto.name);
+      if (existing) {
+        throw new ConflictError('Ya existe otro proveedor con ese nombre.', {
+          conflictingField: 'name',
+          conflictingValue: dto.name
+        });
+      }
+    }
+
+    const updatedEntity = await this.supplierRepository.update(id, dto);
+    return this.toResponseDto(updatedEntity!);
   }
 
   async deleteSupplier(id: string): Promise<void> {

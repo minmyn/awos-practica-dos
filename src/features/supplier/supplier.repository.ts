@@ -24,13 +24,16 @@ export class SupplierRepository {
   }
 
   async findByName(name: string): Promise<SupplierEntity | null> {
-    return SupplierRepository.suppliers.find(s => s.name.toLowerCase() === name.toLowerCase()) || null;
+    // Usamos trim() para evitar que espacios al inicio o final burlen la validación de duplicados
+    return SupplierRepository.suppliers.find(
+      s => s.name.trim().toLowerCase() === name.trim().toLowerCase()
+    ) || null;
   }
 
   async create(dto: CreateSupplierDto): Promise<SupplierEntity> {
     const newSupplier: SupplierEntity = {
       id: crypto.randomUUID(),
-      name: dto.name,
+      name: dto.name.trim(),
       phone: dto.phone,
       zipCode: dto.zipCode
     };
@@ -42,7 +45,7 @@ export class SupplierRepository {
     const supplier = SupplierRepository.suppliers.find(s => s.id === id);
     if (!supplier) return null;
 
-    if (dto.name !== undefined) supplier.name = dto.name;
+    if (dto.name !== undefined) supplier.name = dto.name.trim();
     if (dto.phone !== undefined) supplier.phone = dto.phone;
     if (dto.zipCode !== undefined) supplier.zipCode = dto.zipCode;
 
