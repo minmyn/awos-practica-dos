@@ -2,32 +2,51 @@ import type { SupplierEntity } from './entities/supplier.entity.js';
 import type { CreateSupplierDto } from './dtos/create-supplier.dto.js';
 import type { UpdateSupplierDto } from './dtos/update-supplier.dto.js';
 import type { ISupplierRepository } from './interfaces/supplier.repository.interface.js';
+import { pool } from '../../infra/database/mysql.config.js'; 
+import crypto from 'crypto';
 
 export class SupplierRepository implements ISupplierRepository {
-  private static suppliers: SupplierEntity[] = [
-    ...Array.from({ length: 5 }, (_, index) => {
-      const idNum = index + 1;
-      return {
-        id: crypto.randomUUID(),
-        name: `Proveedor${idNum}`,
-        phone: `55500000${idNum < 10 ? '0' + idNum : idNum}`,
-        zipCode: `100${idNum}`
-      };
-    })
-  ];
 
   async findAll(): Promise<SupplierEntity[]> {
-    return SupplierRepository.suppliers;
+    const [rows]: any = await pool.query('SELECT * FROM suppliers');
+    
+    return rows.map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      phone: row.phone,
+      zipCode: row.zip_code
+    }));
   }
 
   async findById(id: string): Promise<SupplierEntity | null> {
-    return SupplierRepository.suppliers.find(s => s.id === id) || null;
+    const [rows]: any = await pool.query('SELECT * FROM suppliers WHERE id = ?', [id]);
+    
+    if (rows.length === 0) return null;
+    const row = rows[0];
+
+    return {
+      id: row.id,
+      name: row.name,
+      phone: row.phone,
+      zipCode: row.zip_code
+    };
   }
 
   async findByName(name: string): Promise<SupplierEntity | null> {
-    return SupplierRepository.suppliers.find(
-      s => s.name.trim().toLowerCase() === name.trim().toLowerCase()
-    ) || null;
+    const [rows]: any = await pool.query(
+      'SELECT * FROM suppliers WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))', 
+      [name]
+    );
+
+    if (rows.length === 0) return null;
+    const row = rows[0];
+
+    return {
+      id: row.id,
+      name: row.name,
+      phone: row.phone,
+      zipCode: row.zip_code
+    };
   }
 
   async create(dto: CreateSupplierDto): Promise<SupplierEntity> {
@@ -37,26 +56,48 @@ export class SupplierRepository implements ISupplierRepository {
       phone: dto.phone,
       zipCode: dto.zipCode
     };
-    SupplierRepository.suppliers.push(newSupplier);
+
+    await pool.query(
+      'INSERT INTO suppliers (id, name, phone, zip_code) VALUES (?, ?, ?, ?)',
+      [newSupplier.id, newSupplier.name, newSupplier.phone, newSupplier.zipCode]
+    );
+
     return newSupplier;
   }
 
   async update(id: string, dto: UpdateSupplierDto): Promise<SupplierEntity | null> {
-    const supplier = SupplierRepository.suppliers.find(s => s.id === id);
-    if (!supplier) return null;
+    const fields: string[] = [];
+    const values: any[] = [];
 
-    if (dto.name !== undefined) supplier.name = dto.name.trim();
-    if (dto.phone !== undefined) supplier.phone = dto.phone;
-    if (dto.zipCode !== undefined) supplier.zipCode = dto.zipCode;
+    if (dto.name !== undefined) {
+      fields.push('name = ?');
+      values.push(dto.name.trim());
+    }
+    if (dto.phone !== undefined) {
+      fields.push('phone = ?');
+      values.push(dto.phone);
+    }
+    if (dto.zipCode !== undefined) {
+      fields.push('zip_code = ?');
+      values.push(dto.zipCode);
+    }
 
-    return supplier;
+    if (fields.length === 0) {
+      return this.findById(id);
+    }
+
+    values.push(id);
+
+    await pool.query(
+      `UPDATE suppliers SET ${fields.join(', ')} WHERE id = ?`,
+      values
+    );
+
+    return this.findById(id);
   }
 
   async delete(id: string): Promise<boolean> {
-    const index = SupplierRepository.suppliers.findIndex(s => s.id === id);
-    if (index === -1) return false;
-    
-    SupplierRepository.suppliers.splice(index, 1);
-    return true;
+    const [result]: any = await pool.query('DELETE FROM suppliers WHERE id = ?', [id]);
+    return result.affectedRows > 0;
   }
 }
