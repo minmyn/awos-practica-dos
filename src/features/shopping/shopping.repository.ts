@@ -10,10 +10,13 @@ export class PurchaseRepository implements IPurchaseRepository {
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
+      
+      // Corregido: Ahora hay exactamente 4 columnas y 4 valores (eliminamos la fecha)
       await connection.query(
-        'INSERT INTO purchases (id, supplier_id, invoice_number, created_at, active) VALUES (?, ?, ?, ?, ?)',
-        [purchase.id, purchase.supplier.id, purchase.invoiceNumber, purchase.createdAt, purchase.active ? 1 : 0]
+        'INSERT INTO purchases (id, supplier_id, bill, active) VALUES (?, ?, ?, ?)',
+        [purchase.id, purchase.supplier.id, purchase.invoiceNumber, purchase.active ? 1 : 0]
       );
+
       for (const item of purchase.items) {
         await connection.query(
           'INSERT INTO purchase_items (purchase_id, product_id, quantity) VALUES (?, ?, ?)',
@@ -68,7 +71,7 @@ export class PurchaseRepository implements IPurchaseRepository {
       purchases.push({
         id: row.id,
         supplier: { id: row.supplier_id, name: row.supplier_name } as SupplierEntity,
-        invoiceNumber: row.invoice_number,
+        invoiceNumber: row.bill, // Corregido: row.invoice_number -> row.bill
         items: items,
         createdAt: row.created_at,
         active: row.active === 1
@@ -92,9 +95,9 @@ export class PurchaseRepository implements IPurchaseRepository {
 
     const [itemRows]: any = await pool.query(
       `SELECT pi.quantity, pr.* 
-         FROM purchase_items pi 
-         JOIN products pr ON pi.product_id = pr.id 
-         WHERE pi.purchase_id = ?`,
+       FROM purchase_items pi 
+       JOIN products pr ON pi.product_id = pr.id 
+       WHERE pi.purchase_id = ?`,
       [row.id]
     );
 
@@ -111,7 +114,7 @@ export class PurchaseRepository implements IPurchaseRepository {
     return {
       id: row.id,
       supplier: { id: row.supplier_id, name: row.supplier_name } as SupplierEntity,
-      invoiceNumber: row.invoice_number,
+      invoiceNumber: row.bill, // Corregido: row.invoice_number -> row.bill
       items: items,
       createdAt: row.created_at,
       active: row.active === 1
@@ -119,7 +122,8 @@ export class PurchaseRepository implements IPurchaseRepository {
   }
 
   async updateInvoice(id: string, invoiceNumber: string): Promise<PurchaseEntity | null> {
-    await pool.query('UPDATE purchases SET invoice_number = ? WHERE id = ?', [invoiceNumber, id]);
+    // Corregido: Cambiado invoice_number = ? por bill = ?
+    await pool.query('UPDATE purchases SET bill = ? WHERE id = ?', [invoiceNumber, id]);
     return this.findById(id);
   }
 

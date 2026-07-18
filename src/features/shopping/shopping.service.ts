@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { PurchaseRepository } from './shopping.repository.js';
-import { ProductRepositoryMocks } from '../products/product.repository.js';
+import { ProductRepositoryMocks, ProductRepositoryMysql } from '../products/product.repository.js';
 import { SupplierRepository } from '../supplier/supplier.repository.js';
 import { NotFoundError, BadRequestError } from '../../infra/errors/specific.errors.js'; 
 import type { CreatePurchaseDto } from './dtos/create-shopping.dt.js';
@@ -11,7 +11,7 @@ import { PurchaseMapper } from './mappers/shopping.mapper.js';
 
 export class PurchaseService {
   private supplierRepository = new SupplierRepository();
-  private productRepository = new ProductRepositoryMocks();
+  private productRepository = new ProductRepositoryMysql();
 
   constructor(private purchaseRepository: PurchaseRepository) {}
 
@@ -55,7 +55,7 @@ export class PurchaseService {
       supplier,
       invoiceNumber: dto.bill.trim(),
       items: purchaseItemsEntities,
-      createdAt: new Date().toISOString(),
+      createdAt: undefined as any,
       active: true
     };
 
