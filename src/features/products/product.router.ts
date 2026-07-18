@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { ProductRepositoryMocks } from './product.repository.js';
-import { CategoryRepositoryMocks } from '../catalog/catalog.repository.js';
+import { ProductRepositoryMysql } from './product.repository.js';
+import { CategoryRepositoryMysql } from '../catalog/catalog.repository.js';
 import { ProductService } from './product.service.js';
 import { ProductController } from './product.controller.js';
 import { authMiddleware } from '../../infra/middlewares/auth.middleware.js';
@@ -8,8 +8,8 @@ import { authorize } from '../../infra/middlewares/role.middleware.js';
 
 const router = Router();
 
-const productRepository = new ProductRepositoryMocks();
-const categoryRepository = new CategoryRepositoryMocks();
+const productRepository = new ProductRepositoryMysql();
+const categoryRepository = new CategoryRepositoryMysql();
 const service = new ProductService(productRepository, categoryRepository);
 const controller = new ProductController(service);
 

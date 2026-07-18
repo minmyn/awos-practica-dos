@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { CategoryRepositoryMocks } from './catalog.repository.js';
+import { CategoryRepositoryMysql } from './catalog.repository.js';
 import { CategoryService } from './catalog.service.js';
 import { CategoryController } from './catalog.controller.js';
 import { authMiddleware } from '../../infra/middlewares/auth.middleware.js';
@@ -7,7 +7,7 @@ import { authorize } from '../../infra/middlewares/role.middleware.js';
 
 const router = Router();
 
-const repository = new CategoryRepositoryMocks();
+const repository = new CategoryRepositoryMysql();
 const service = new CategoryService(repository);
 const controller = new CategoryController(service);
 

@@ -2,6 +2,8 @@ import type { UserEntity } from './entities/user.entity.js';
 import type { UpdateUserDto } from './dtos/update-user.dto.js';
 import { IUserRepository } from './interfaces/user.repository.interface.js';
 import bcrypt from 'bcryptjs';
+import { pool } from '../../infra/database/mysql.config.js';
+import { RowDataPacket } from 'mysql2';
 
 export class UserRepositoryMock implements IUserRepository {
   private static users: UserEntity[] = [
@@ -56,24 +58,67 @@ export class UserRepositoryMock implements IUserRepository {
 }
 
 export class UserRepositoryMysql implements IUserRepository {
+  private mapRowToEntity(row: any): UserEntity {
+    return {
+      id: row.id,
+      name: row.name,
+      username: row.username,
+      email: row.email,
+      password: row.password,
+      role: {
+        id: row.role_id,
+        name: row.role_name
+      }
+    };
+  }
+
   async findAll(): Promise<UserEntity[]> {
-    throw new Error('Method not implemented.');
+    const query = `
+      SELECT u.*, r.name as role_name 
+      FROM users u JOIN roles r ON u.role_id = r.id
+    `;
+    const [rows] = await pool.query(query) as [RowDataPacket[], any];
+    return rows.map(row => this.mapRowToEntity(row));
   }
+
   async findById(id: string): Promise<UserEntity | null> {
-    throw new Error('Method not implemented.');
+    const query = `
+      SELECT u.*, r.name as role_name 
+      FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?
+    `;
+    const [rows] = await pool.query(query, [id]) as [RowDataPacket[], any];
+    return rows.length ? this.mapRowToEntity(rows[0]) : null;
   }
+
   async findByUsername(username: string): Promise<UserEntity | null> {
-    throw new Error('Method not implemented.');
+    const query = `
+      SELECT u.*, r.name as role_name 
+      FROM users u JOIN roles r ON u.role_id = r.id WHERE LOWER(u.username) = LOWER(?)
+    `;
+    const [rows] = await pool.query(query, [username]) as [RowDataPacket[], any];
+    return rows.length ? this.mapRowToEntity(rows[0]) : null;
   }
-  
+
   async create(entity: UserEntity): Promise<UserEntity> {
-    throw new Error('Method not implemented.');
+    const query = 'INSERT INTO users (id, name, username, email, password, role_id) VALUES (?, ?, ?, ?, ?, ?)';
+    await pool.query(query, [
+      entity.id, entity.name, entity.username, entity.email, entity.password, entity.role.id
+    ]);
+    return entity;
   }
 
   async update(id: string, dto: UpdateUserDto): Promise<UserEntity | null> {
-    throw new Error('Method not implemented.');
+    const user = await this.findById(id);
+    if (!user) return null;
+    
+    const updated = { ...user, ...dto };
+    const query = 'UPDATE users SET name = ?, username = ?, email = ?, password = ? WHERE id = ?';
+    await pool.query(query, [updated.name, updated.username, updated.email, updated.password, id]);
+    return updated;
   }
+
   async hardDelete(id: string): Promise<boolean> {
-    throw new Error('Method not implemented.');
+    const [result] = await pool.query('DELETE FROM users WHERE id = ?', [id]) as [any, any];
+    return result.affectedRows > 0;
   }
 }

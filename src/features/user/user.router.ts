@@ -8,7 +8,7 @@ import { IUserRepository } from './interfaces/user.repository.interface.js';
 
 const router = Router();
 
-const repository: IUserRepository = new UserRepositoryMock();
+const repository: IUserRepository = new UserRepositoryMysql();
 const service = new UserService(repository);
 const controller = new UserController(service);
 
