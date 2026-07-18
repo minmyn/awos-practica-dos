@@ -2,10 +2,12 @@ import crypto from 'crypto';
 import { PurchaseRepository } from './shopping.repository.js';
 import { ProductRepositoryMocks } from '../products/product.repository.js';
 import { SupplierRepository } from '../supplier/supplier.repository.js';
-import { NotFoundError, BadRequestError } from '../../infra/errors/specific.errors.js';
+import { NotFoundError, BadRequestError } from '../../infra/errors/specific.errors.js'; 
 import type { CreatePurchaseDto } from './dtos/create-shopping.dt.js';
 import type { PurchaseResponseDto } from './dtos/shopping-response.tdo.js';
 import type { PurchaseEntity, PurchaseItemEntity } from './entities/shopping.entity.js';
+import { PurchaseMapper } from './mappers/shopping.mapper.js';
+
 
 export class PurchaseService {
   private supplierRepository = new SupplierRepository();
@@ -14,7 +16,6 @@ export class PurchaseService {
   constructor(private purchaseRepository: PurchaseRepository) {}
 
   async createPurchase(dto: CreatePurchaseDto): Promise<PurchaseResponseDto> {
-    // REGLA: La factura no debe venir vacía ni con puros espacios
     if (!dto.bill || dto.bill.trim() === '') {
       throw new BadRequestError('El número de factura (bill) no puede estar vacío o contener solo espacios.', { bill: dto.bill });
     }
@@ -27,7 +28,6 @@ export class PurchaseService {
     const purchaseItemsEntities: PurchaseItemEntity[] = [];
 
     for (const item of dto.items) {
-      // REGLA: La cantidad comprada debe ser mayor a 0
       if (typeof item.quantity !== 'number' || item.quantity <= 0) {
         throw new BadRequestError('La cantidad de cada artículo comprado debe ser un número entero mayor a cero.', { 
           productName: item.productName, 
@@ -60,12 +60,12 @@ export class PurchaseService {
     };
 
     const savedEntity = await this.purchaseRepository.create(newPurchase);
-    return this.toResponseDto(savedEntity);
+    return PurchaseMapper.toResponseDto(savedEntity);
   }
 
   async getPurchases(): Promise<PurchaseResponseDto[]> {
     const list = await this.purchaseRepository.findAll();
-    return list.map(p => this.toResponseDto(p));
+    return list.map(p => PurchaseMapper.toResponseDto(p));
   }
 
   async getPurchaseById(id: string): Promise<PurchaseResponseDto> {
@@ -73,7 +73,7 @@ export class PurchaseService {
     if (!purchase) {
       throw new NotFoundError('La compra solicitada no existe o fue removida lógicamente.', { searchedId: id });
     }
-    return this.toResponseDto(purchase);
+    return PurchaseMapper.toResponseDto(purchase);
   }
 
   async removePurchase(id: string): Promise<void> {
@@ -82,7 +82,6 @@ export class PurchaseService {
       throw new NotFoundError('La compra solicitada no existe o fue removida lógicamente.', { searchedId: id });
     }
 
-    
     for (const item of purchase.items) {
       if (item.product.inStock < item.quantity) {
         throw new BadRequestError(
@@ -96,18 +95,5 @@ export class PurchaseService {
       item.product.inStock -= item.quantity;
     }
     await this.purchaseRepository.softDelete(id);
-  }
-
-  private toResponseDto(entity: PurchaseEntity): PurchaseResponseDto {
-    return {
-      id: entity.id,
-      supplierName: entity.supplier.name,
-      bill: entity.invoiceNumber,
-      items: entity.items.map(item => ({
-        productName: item.product.name,
-        quantity: item.quantity
-      })),
-      createdAt: entity.createdAt
-    };
   }
 }

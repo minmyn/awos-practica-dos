@@ -2,8 +2,9 @@ import crypto from 'crypto';
 import type { PurchaseEntity } from './entities/shopping.entity.js';
 import type { SupplierEntity } from '../supplier/entities/supplier.entity.js';
 import type { ProductEntity } from '../products/entities/product.entity.js';
+import type { IPurchaseRepository } from './interfaces/shopping.repository.interface.js';
 
-export class PurchaseRepository {
+export class PurchaseRepository implements IPurchaseRepository {
   private static purchases: PurchaseEntity[] = [];
 
   constructor() {

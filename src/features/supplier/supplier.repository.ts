@@ -1,8 +1,9 @@
 import type { SupplierEntity } from './entities/supplier.entity.js';
 import type { CreateSupplierDto } from './dtos/create-supplier.dto.js';
 import type { UpdateSupplierDto } from './dtos/update-supplier.dto.js';
+import type { ISupplierRepository } from './interfaces/supplier.repository.interface.js';
 
-export class SupplierRepository {
+export class SupplierRepository implements ISupplierRepository {
   private static suppliers: SupplierEntity[] = [
     ...Array.from({ length: 5 }, (_, index) => {
       const idNum = index + 1;
@@ -24,7 +25,6 @@ export class SupplierRepository {
   }
 
   async findByName(name: string): Promise<SupplierEntity | null> {
-    // Usamos trim() para evitar que espacios al inicio o final burlen la validación de duplicados
     return SupplierRepository.suppliers.find(
       s => s.name.trim().toLowerCase() === name.trim().toLowerCase()
     ) || null;
